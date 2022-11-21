@@ -56,8 +56,8 @@ def github():
     # Extract the choosen repositories from the request
     repo_name = body['repository']
     # Add your own GitHub Token to run it local
-    token = os.environ.get(
-        'GITHUB_TOKEN', 'YOUR_GITHUB_TOKEN')
+    #token = os.environ.get('GITHUB_TOKEN', 'YOUR_GITHUB_TOKEN')
+    token = os.environ.get('GITHUB_TOKEN', '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')
     GITHUB_URL = f"https://api.github.com/"
     headers = {
         "Authorization": f'token {token}'
@@ -171,6 +171,338 @@ def github():
         array = [str(key), month_issue_closed_dict[key]]
         closed_at_issues.append(array)
 
+
+    '''
+    Weekly created closed issues 52*2=104 weeks    
+    '''
+    today1 = date.today()
+
+    issues_reponse1 = []
+    # Iterating to get issues for every month for the past 24 months
+    for i in range(104):
+        last_week = today1 + dateutil.relativedelta.relativedelta(days=-7)
+        types = 'type:issue'
+        repo = 'repo:' + repo_name
+        ranges = 'created:' + str(last_week) + '..' + str(today1)
+        # By default GitHub API returns only 30 results per page
+        # The maximum number of results per page is 100
+        # For more info, visit https://docs.github.com/en/rest/reference/repos 
+        per_page = 'per_page=100'
+        # Search query will create a query to fetch data for a given repository in a given time range
+        search_query = types + ' ' + repo + ' ' + ranges
+
+        # Append the search query to the GitHub API URL 
+        query_url = GITHUB_URL + "search/issues?q=" + search_query + "&" + per_page
+        # requsets.get will fetch requested query_url from the GitHub API
+        search_issues = requests.get(query_url, headers=headers, params=params)
+        # Convert the data obtained from GitHub API to JSON format
+        search_issues = search_issues.json()
+        issues_items = []
+        try:
+            # Extract "items" from search issues
+            issues_items = search_issues.get("items")
+        except KeyError:
+            error = {"error": "Data Not Available"}
+            resp = Response(json.dumps(error), mimetype='application/json')
+            resp.status_code = 500
+            return resp
+        if issues_items is None:
+            continue
+        for issue in issues_items:
+            label_name = []
+            data = {}
+            current_issue = issue
+            # Get issue number
+            data['issue_number'] = current_issue["number"]
+            # Get created date of issue
+            data['created_at'] = current_issue["created_at"][0:10]
+            if current_issue["closed_at"] == None:
+                data['closed_at'] = current_issue["closed_at"]
+            else:
+                # Get closed date of issue
+                data['closed_at'] = current_issue["closed_at"][0:10]
+            for label in current_issue["labels"]:
+                # Get label name of issue
+                label_name.append(label["name"])
+            data['labels'] = label_name
+            # It gives state of issue like closed or open
+            data['State'] = current_issue["state"]
+            # Get Author of issue
+            data['Author'] = current_issue["user"]["login"]
+            issues_reponse1.append(data)
+
+        today1 = last_week
+
+    df1 = pd.DataFrame(issues_reponse1)
+
+    '''
+    Weekly Closed Issues
+    Format the data by grouping the data by month
+    ''' 
+    
+    closed_at = df1['closed_at'].sort_values(ascending=True)
+    week_issue_closed = pd.to_datetime(
+        pd.Series(closed_at), format='%Y/%m/%d')
+    week_issue_closed.index = week_issue_closed.dt.to_period('d')
+    week_issue_closed = week_issue_closed.groupby(level=0).size()
+    week_issue_closed = week_issue_closed.reindex(pd.period_range(
+        week_issue_closed.index.min(), week_issue_closed.index.max(), freq='d'), fill_value=0)
+    week_issue_closed_dict = week_issue_closed.to_dict()
+    closed_at_issues1 = []
+    for key in week_issue_closed_dict.keys():
+        array = [str(key), week_issue_closed_dict[key]]
+        closed_at_issues1.append(array)
+
+
+    '''
+    Pull request code
+    '''
+    pull_reponse = []
+    # Iterating to get issues for every month for the past 24 months
+    for i in range(24):
+        last_month = today + dateutil.relativedelta.relativedelta(months=-1)
+        types = 'type:pulls'
+        repo = repo_name
+        ranges = 'created:' + str(last_month) + '..' + str(today)
+        # By default GitHub API returns only 30 results per page
+        # The maximum number of results per page is 100
+        # For more info, visit https://docs.github.com/en/rest/reference/repos 
+        per_page = 'per_page=100'
+        # Search query will create a query to fetch data for a given repository in a given time range
+        # Search query will create a query to fetch data for a given repository in a given time range
+        search_query = types  + ' ' + ranges
+
+        # Append the search query to the GitHub API URL 
+        query_url = GITHUB_URL +'repos/' + repo + "/pulls?q=" + search_query + "&" + per_page 
+               # requsets.get will fetch requested query_url from the GitHub API
+        search_issues = requests.get(query_url, headers=headers, params=params)
+        # Convert the data obtained from GitHub API to JSON format
+        search_issues = search_issues.json()
+        pulls_items = []
+        try:
+            # Extract "items" from search issues
+            pulls_items = search_issues
+        except KeyError:
+            error = {"error": "Data Not Available"}
+            resp = Response(json.dumps(error), mimetype='application/json')
+            resp.status_code = 500
+            return resp
+        if pulls_items is None:
+            continue
+        for pulls in pulls_items:
+            label_name = []
+            data = {}
+            current_issue = pulls
+            # Get issue number
+            data['issue_number'] = current_issue["number"]
+            # Get created date of issue
+            data['created_at'] = current_issue["created_at"][0:10]
+            if current_issue["closed_at"] == None:
+                data['closed_at'] = current_issue["closed_at"]
+            else:
+                # Get closed date of issue
+                data['closed_at'] = current_issue["closed_at"][0:10]
+            for label in current_issue["labels"]:
+                # Get label name of issue
+                label_name.append(label["name"])
+            data['labels'] = label_name
+            # It gives state of issue like closed or open
+            data['State'] = current_issue["state"]
+            # Get Author of issue
+            data['Author'] = current_issue["user"]["login"]
+            pull_reponse.append(data)
+
+        today = last_month
+    
+
+    '''
+    Commits
+    '''
+    commit_reponse = []
+    # Iterating to get issues for every month for the past 24 months
+    for i in range(24):
+        last_month = today + dateutil.relativedelta.relativedelta(months=-1)
+        types = 'type:commits'
+        repo = repo_name
+        ranges = 'created:' + str(last_month) + '..' + str(today)
+        # By default GitHub API returns only 30 results per page
+        # The maximum number of results per page is 100
+        # For more info, visit https://docs.github.com/en/rest/reference/repos 
+        per_page = 'per_page=100'
+        # Search query will create a query to fetch data for a given repository in a given time range
+        # Search query will create a query to fetch data for a given repository in a given time range
+        search_query = types  + ' ' + ranges
+
+        # Append the search query to the GitHub API URL 
+        query_url = GITHUB_URL +'repos/' + repo + "/commits?q=" + search_query + "&" + per_page 
+        # requsets.get will fetch requested query_url from the GitHub API
+        query_url = GITHUB_URL +'repos/' + repo + "/pulls?q=" + search_query + "&" + per_page 
+        search_issues = requests.get(query_url, headers=headers, params=params)
+        # Convert the data obtained from GitHub API to JSON format
+        search_issues = search_issues.json()
+        commit_items = []
+        try:
+            # Extract "items" from search issues
+            commit_items = search_issues
+        except KeyError:
+            error = {"error": "Data Not Available"}
+            resp = Response(json.dumps(error), mimetype='application/json')
+            resp.status_code = 500
+            return resp
+        if commit_items is None:
+            continue
+        for pulls in commit_items:
+            label_name = []
+            data = {}
+            current_issue = pulls
+            # Get issue number
+            data['issue_number'] = current_issue["number"]
+            # Get created date of issue
+            data['created_at'] = current_issue["created_at"][0:10]
+            if current_issue["closed_at"] == None:
+                data['closed_at'] = current_issue["closed_at"]
+            else:
+                # Get closed date of issue
+                data['closed_at'] = current_issue["closed_at"][0:10]
+            for label in current_issue["labels"]:
+                # Get label name of issue
+                label_name.append(label["name"])
+            data['labels'] = label_name
+            # It gives state of issue like closed or open
+            data['State'] = current_issue["state"]
+            # Get Author of issue
+            data['Author'] = current_issue["user"]["login"]
+            commit_reponse.append(data)
+
+        today = last_month
+
+    '''
+    Branches
+    '''
+    branch_reponse = []
+    # Iterating to get issues for every month for the past 24 months
+    for i in range(24):
+        last_month = today + dateutil.relativedelta.relativedelta(months=-1)
+        types = 'type:commits'
+        repo = repo_name
+        ranges = 'created:' + str(last_month) + '..' + str(today)
+        # By default GitHub API returns only 30 results per page
+        # The maximum number of results per page is 100
+        # For more info, visit https://docs.github.com/en/rest/reference/repos 
+        per_page = 'per_page=100'
+        # Search query will create a query to fetch data for a given repository in a given time range
+        # Search query will create a query to fetch data for a given repository in a given time range
+        search_query = types  + ' ' + ranges
+
+        # Append the search query to the GitHub API URL 
+        query_url = GITHUB_URL +'repos/' + repo + "/branches?q=" + search_query + "&" + per_page 
+        # requsets.get will fetch requested query_url from the GitHub API
+        query_url = GITHUB_URL +'repos/' + repo + "/pulls?q=" + search_query + "&" + per_page                
+        search_issues = requests.get(query_url, headers=headers, params=params)
+        # Convert the data obtained from GitHub API to JSON format
+        search_issues = search_issues.json()
+        commit_items = []
+        try:
+            # Extract "items" from search issues
+            commit_items = search_issues
+        except KeyError:
+            error = {"error": "Data Not Available"}
+            resp = Response(json.dumps(error), mimetype='application/json')
+            resp.status_code = 500
+            return resp
+        if commit_items is None:
+            continue
+        for pulls in commit_items:
+            label_name = []
+            data = {}
+            current_issue = pulls
+            # Get issue number
+            data['issue_number'] = current_issue["number"]
+            # Get created date of issue
+            data['created_at'] = current_issue["created_at"][0:10]
+            if current_issue["closed_at"] == None:
+                data['closed_at'] = current_issue["closed_at"]
+            else:
+                # Get closed date of issue
+                data['closed_at'] = current_issue["closed_at"][0:10]
+            for label in current_issue["labels"]:
+                # Get label name of issue
+                label_name.append(label["name"])
+            data['labels'] = label_name
+            # It gives state of issue like closed or open
+            data['State'] = current_issue["state"]
+            # Get Author of issue
+            data['Author'] = current_issue["user"]["login"]
+            branch_reponse.append(data)
+
+        today = last_month
+
+
+    '''
+    Contributors
+    '''
+    contri_reponse = []
+    # Iterating to get issues for every month for the past 24 months
+    for i in range(24):
+        last_month = today + dateutil.relativedelta.relativedelta(months=-1)
+        types = 'type:contributor'
+        repo = repo_name
+        ranges = 'created:' + str(last_month) + '..' + str(today)
+        # By default GitHub API returns only 30 results per page
+        # The maximum number of results per page is 100
+        # For more info, visit https://docs.github.com/en/rest/reference/repos 
+        per_page = 'per_page=100'
+        # Search query will create a query to fetch data for a given repository in a given time range
+        # Search query will create a query to fetch data for a given repository in a given time range
+        search_query = types  + ' ' + ranges
+
+        # Append the search query to the GitHub API URL 
+        query_url = GITHUB_URL +'repos/' + repo + "/contributor?q=" + search_query + "&" + per_page 
+               # requsets.get will fetch requested query_url from the GitHub API
+        query_url = GITHUB_URL +'repos/' + repo + "/pulls?q=" + search_query + "&" + per_page                
+        search_issues = requests.get(query_url, headers=headers, params=params)
+        # Convert the data obtained from GitHub API to JSON format
+        search_issues = search_issues.json()
+        commit_items = []
+        try:
+            # Extract "items" from search issues
+            commit_items = search_issues
+        except KeyError:
+            error = {"error": "Data Not Available"}
+            resp = Response(json.dumps(error), mimetype='application/json')
+            resp.status_code = 500
+            return resp
+        if commit_items is None:
+            continue
+        for pulls in commit_items:
+            label_name = []
+            data = {}
+            current_issue = pulls
+            # Get issue number
+            data['issue_number'] = current_issue["number"]
+            # Get created date of issue
+            data['created_at'] = current_issue["created_at"][0:10]
+            if current_issue["closed_at"] == None:
+                data['closed_at'] = current_issue["closed_at"]
+            else:
+                # Get closed date of issue
+                data['closed_at'] = current_issue["closed_at"][0:10]
+            for label in current_issue["labels"]:
+                # Get label name of issue
+                label_name.append(label["name"])
+            data['labels'] = label_name
+            # It gives state of issue like closed or open
+            data['State'] = current_issue["state"]
+            # Get Author of issue
+            data['Author'] = current_issue["user"]["login"]
+            contri_reponse.append(data)
+
+        today = last_month
+
+    '''
+    Releases
+    '''
+
     '''
         1. Hit LSTM Microservice by passing issues_response as body
         2. LSTM Microservice will give a list of string containing image paths hosted on google cloud storage
@@ -187,10 +519,35 @@ def github():
         "type": "closed_at",
         "repo": repo_name.split("/")[1]
     }
+    pulls_at_body = {
+        "issues": issues_reponse,
+        "type": "created_at",
+        "repo": repo_name.split("/")[1]
+    }
+    commit_at_body = {
+        "issues": issues_reponse,
+        "type": "closed_at",
+        "repo": repo_name.split("/")[1]
+    }    
+    branches_at_body = {
+        "issues": issues_reponse,
+        "type": "created_at",
+        "repo": repo_name.split("/")[1]
+    }        
+    contributor_at_body = {
+        "issues": issues_reponse,
+        "type": "closed_at",
+        "repo": repo_name.split("/")[1]
+    } 
+    releases_at_body = {
+        "issues": issues_reponse,
+        "type": "created_at",
+        "repo": repo_name.split("/")[1]
+    }           
 
     # Update your Google cloud deployed LSTM app URL (NOTE: DO NOT REMOVE "/")
-    LSTM_API_URL = "https://lstm-frir4jv4uq-uc.a.run.app/" + "api/forecast"
-
+    LSTM_API_URL = "https://lstm-dijoq5joua-uc.a.run.app/" + "api/forecast"
+    #LSTM_API_URL = "http://10.0.0.178:8080/"+ "api/forecast"
     '''
     Trigger the LSTM microservice to forecasted the created issues
     The request body consists of created issues obtained from GitHub API in JSON format
@@ -209,6 +566,22 @@ def github():
                                        json=closed_at_body,
                                        headers={'content-type': 'application/json'})
     
+    pulls_response = requests.post(LSTM_API_URL,
+                                       json=pulls_at_body,
+                                       headers={'content-type': 'application/json'})
+
+    commits_response = requests.post(LSTM_API_URL,
+                                       json=commit_at_body,
+                                       headers={'content-type': 'application/json'})
+    branches_response = requests.post(LSTM_API_URL,
+                                       json=branches_at_body,
+                                       headers={'content-type': 'application/json'})
+    contributors_response = requests.post(LSTM_API_URL,
+                                       json=contributor_at_body,
+                                       headers={'content-type': 'application/json'}) 
+    releases_response = requests.post(LSTM_API_URL,
+                                       json=releases_at_body,
+                                       headers={'content-type': 'application/json'})                                                                                                                    
     '''
     Create the final response that consists of:
         1. GitHub repository data obtained from GitHub API
@@ -217,15 +590,36 @@ def github():
     json_response = {
         "created": created_at_issues,
         "closed": closed_at_issues,
-        "starCount": repository["stargazers_count"],
-        "forkCount": repository["forks_count"],
+        "closed_week": closed_at_issues1,
+        "starCount": ["count",repository["stargazers_count"]],
+        "forkCount": ["count",repository["forks_count"]],
+        "stacked": [{"name":"created", "data":created_at_issues},{"name":"closed","data":closed_at_issues}],
+        "max_issue_created_day": max(created_at_issues,key=lambda x:x[1]),
+        "max_issue_closed_day":max(closed_at_issues1,key=lambda x:x[1]),
+        "max_issue_close_month":max(closed_at_issues1,key=lambda x:x[1])[0][5:7],
         "createdAtImageUrls": {
             **created_at_response.json(),
         },
         "closedAtImageUrls": {
             **closed_at_response.json(),
         },
+        "PullsImageUrls": {
+            **pulls_response.json(),
+        },
+        "CommitsImageUrls": {
+            **commits_response.json(),
+        },
+        "BranchesImageUrls": {
+            **branches_response.json(),
+        }, 
+        "ContributorsImageUrls": {
+            **contributors_response.json(),
+        }, 
+        "ReleasesImageUrls": {
+            **releases_response.json(),
+        },                              
     }
+    print("json ",json_response)
     # Return the response back to client (React app)
     return jsonify(json_response)
 
