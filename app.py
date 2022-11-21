@@ -56,8 +56,8 @@ def github():
     # Extract the choosen repositories from the request
     repo_name = body['repository']
     # Add your own GitHub Token to run it local
-    #token = os.environ.get('GITHUB_TOKEN', 'YOUR_GITHUB_TOKEN')
-    token = os.environ.get('GITHUB_TOKEN', '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')
+    token = os.environ.get('GITHUB_TOKEN', 'YOUR_GITHUB_TOKEN')
+    #token = os.environ.get('GITHUB_TOKEN', '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')
     GITHUB_URL = f"https://api.github.com/"
     headers = {
         "Authorization": f'token {token}'
